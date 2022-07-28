@@ -23,6 +23,8 @@ import org.apache.xmlbeans.impl.xb.xmlconfig.*;
 import javax.xml.namespace.QName;
 import java.io.File;
 import java.util.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * An implementation of BindingConfig
@@ -71,15 +73,22 @@ public class BindingConfigImpl extends BindingConfig {
     }
     
     private static final Map<JavaFilesClasspath, Parser> _parserMap = new HashMap<>();
+    private static final Lock _staticLock = new ReentrantLock();
     
     private static Parser parserInstance(File[] javaFiles, File[] classpath) {
         JavaFilesClasspath jfc = new JavaFilesClasspath(javaFiles, classpath);
-        Parser parser = _parserMap.get(jfc);
-        if ( parser == null ) {
-            parser = new Parser(javaFiles, classpath);
-            _parserMap.put(jfc, parser);
+        try {
+            _staticLock.lock();
+            Parser parser = _parserMap.get(jfc);
+            if ( parser == null ) {
+                parser = new Parser(javaFiles, classpath);
+                _parserMap.put(jfc, parser);
+            }
+            return parser;
         }
-        return parser;
+        finally {
+            _staticLock.unlock();
+        }
     }
     
     public static BindingConfig forConfigDocuments(Config[] configs, File[] javaFiles, File[] classpath) {
